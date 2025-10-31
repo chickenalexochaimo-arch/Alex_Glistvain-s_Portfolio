@@ -1,0 +1,339 @@
+// This was a small project I built for my friend and I
+// Essentially, this is the server of the bank I made
+var http = require("http");
+var counter = 0;
+var bank_state_template = {
+    accounts: [],
+    admin_passwords: ["admin"],
+};
+
+var body = "";
+
+const fs = require("fs");
+
+const crypto = require("crypto");
+const hash = crypto.createHash("sha256");
+
+function hashPassword(passw_string)
+{
+    const hash = crypto.createHash("sha256");
+    var comp_val;
+    hash.on("readable", () =>
+    {
+        const data = hash.read();
+
+        if (data)
+        {
+            hashed_data = data;
+            comp_val = data.toString("hex");
+            //console.log("hash="+data.toString('hex'));
+            // Prints:
+            //  6a2da20943931e9834fc12cfe5bb47bbd9ae43489a30726962b576f4e3993e50
+            //gen.next();
+        }
+    });
+    hash.write(passw_string);
+    hash.end();
+    return comp_val;
+}
+
+var debits = [
+    {
+        name: `alex`,
+        num: 798,
+        money: 0,
+        salt: (100000000 * Math.random()).toString(),
+        password: `123`,
+        admin: 1,
+    },
+];
+var log = [];
+debits[0].password = hashPassword(debits[0].password + debits[0].salt);
+console.log(`hash=${hashPassword("this is a test")}`);
+console.log(`hash=${hashPassword("this is   test")}`);
+console.log(`hash=${hashPassword("this is a test")}`);
+console.log(`hash=${hashPassword("this is a test" + "pw%32B!hy")}`);
+
+var data;
+try
+{
+    debits = JSON.parse(fs.readFileSync("bank_state.txt"));
+} catch (e)
+{
+    fs.writeFileSync("bank_state.txt", JSON.stringify(debits));
+}
+
+try
+{
+    log = JSON.parse(fs.readFileSync("bank_log.txt"));
+    console.log(`1   ${log}`);
+} catch (e)
+{
+    fs.writeFileSync("bank_log.txt", JSON.stringify(log));
+    console.log(JSON.stringify(log));
+}
+
+var headers = {
+    "Access-Control-Allow-Origin": "*" /* @dev First, read about security */,
+    "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
+    "Access-Control-Max-Age": 2592000, // 30 days
+    /** add other headers as per requirement */
+};
+
+function processReqAndSendResp(req, res)
+{
+    var respon = ``;
+    console.log("body=" + body);
+    console.log("request done");
+    var req1 = JSON.parse(body);
+    var true_false = 0;
+    var i;
+    var user = -1;
+    if (req1.command == `new_account`)
+    {
+        var salt = (100000000 * Math.random()).toString();
+        debits.length++;
+        debits[debits.length - 1] = {
+            num: req1.num,
+            name: req1.name,
+            money: req1.money,
+            password: hashPassword(req1.password + salt),
+            admin: 0,
+            salt: salt,
+        };
+        respon = { command: `account_registered` };
+    } else if (req1.command == `get_debits`)
+    {
+        respon = { command: `account_is_fake` };
+        if (
+            debits[req1.user].admin == 0 &&
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            respon = { command: `send_debits`, debits_arr: debits[req1.user] };
+        } else
+        {
+            if
+                (
+                debits[req1.user].admin == 1 &&
+                debits[req1.user].password ==
+                hashPassword(req1.password + debits[req1.user].salt)
+            )
+            {
+                respon = { command: `send_debits`, debits_arr: debits };
+            }
+        }
+    }
+    else if (req1.command == `get_log`)
+    {
+        console.log(`admin on person    ${debits[req1.user].admin}`);
+        console.log(
+            `password correct=${debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+            }`
+        );
+        if (
+            debits[req1.user].admin == 1 &&
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            console.log(`jmdkkjsdliqei389383921`);
+            respon = { command: `send_log`, log_arr: log };
+        }
+    } else if (req1.command == `check_password`)
+    {
+        // user here means name
+      console.log(`user=${req1.user}   password =${req1.password}`);
+        for (i = 0; i < debits.length; i++)
+        {
+            if ((debits[i].name == req1.user )&&( debits[i].password == hashPassword(req1.password + debits[i].salt) ))
+            {
+                true_false = 1;
+                user = i;
+              console.log(`i got throught password_check`)
+            } else if ( `everyone` == req1.user && debits[i].password == hashPassword(req1.password + debits[i].salt))
+       
+            {
+                true_false = 1;
+                user = i;
+            }
+        }
+        respon = {
+            command: `password_checked`,
+            true_false: true_false,
+            user: user,
+        };
+    } else if (req1.command == `change_password`)
+    {
+        if (
+            hashPassword(req1.old_password + debits[req1.user].salt) ==
+            debits[req1.user].password
+        )
+        {
+            debits[req1.user].salt = (100000000 * Math.random()).toString();
+            debits[req1.user].password = hashPassword(
+                req1.password_to_change_to + debits[req1.user].salt
+            );
+            respon = {
+                command: `password_changed`,
+                password: debits[req1.user].password,
+            };
+        }
+    } else if (req1.command == `update_debits`)
+    {
+        if (
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            if (req1.num_boke_coins == ``)
+            {
+                debits[req1.person].money += 0;
+            } else
+            {
+                debits[req1.person].money += parseInt(req1.num_boke_coins);
+            }
+            respon = { command: `debits_updated` };
+        }
+    } else if (req1.command == `get_name_list`)
+    {
+        var i;
+        var name_arr = [];
+        for (i = 0; i < debits.length; i++)
+        {
+            if (debits[i].admin != 1)
+            {
+                name_arr.length++;
+                name_arr[name_arr.length - 1] = debits[i].name;
+            }
+        }
+        respon = { command: `name_list_created`, arr: name_arr };
+    } else if (req1.command == `transfer_money`)
+    {
+        if (
+            debits[req1.user].admin == 0 &&
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            for (i = 0; i < debits.length; i++)
+            {
+                if (debits[i].name == req1.who_to_transfer_to)
+                {
+                    user = i;
+                    // user now means the actuall number of who to transfer to
+                }
+            }
+            debits[user].money += Math.abs(parseInt(req1.amount));
+            debits[req1.me].money -= Math.abs(parseInt(req1.amount));
+
+            log.length++;
+            log[
+                log.length - 1
+            ] = `${debits[req1.me].name} transfered ${req1.amount} to ${req1.who_to_transfer_to}  at ${ new Date().toLocaleString("en-US", {timeZone:  "America/Chicago"})}`;
+            console.log(log);
+            respon = { command: `transfer_sucsessful` };
+        }
+    } else if (req1.command == `delete_account`)
+    {
+        console.log(`t1 ${req1.user}`);
+        if (
+            debits[req1.user].admin == 1 &&
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            console.log(`t2`);
+            for (i = 0; i < debits.length; i++)
+            {
+                if (i == req1.who_to_delete)
+                {
+                    console.log(`t3 ${i}`);
+
+                    break;
+                }
+            }
+            delete_from_array(i, debits);
+            respon = { command: `delete_sucsessful` }; //delete_sucsesful
+        }
+    } else if (req1.command == `reset_password`)
+    {
+        console.log(`t1 ${req1.user}`);
+        if (
+            debits[req1.user].admin == 1 &&
+            debits[req1.user].password ==
+            hashPassword(req1.password + debits[req1.user].salt)
+        )
+        {
+            debits[req1.who_to_reset].salt = (100000000 * Math.random()).toString();
+            debits[req1.who_to_reset].password = hashPassword(
+                req1.password_to_change_to + debits[req1.who_to_reset].salt
+            );
+            //  debits[i].password=hashPassword(`123` + debits[i].salt);
+            //console.log()
+
+            respon = { command: `reset_sucsessful` }; //delete_sucsesful
+        }
+    }
+
+    //res.setHeader("Content-Type", "application/json");
+    fs.writeFileSync("bank_state.txt", JSON.stringify(debits));
+
+    fs.writeFileSync("bank_log.txt", JSON.stringify(log));
+    console.log(`2   ${JSON.stringify(log)}`);
+    res.writeHead(200, headers);
+    var obj_resp = respon;
+    console.log(`send to client ${JSON.stringify(obj_resp)}`);
+    res.end(JSON.stringify(obj_resp));
+}
+function delete_from_array(index, arr)
+{
+    var i;
+    for (i = index; i < arr.length - 1; i++)
+    {
+        arr[i] = arr[i + 1];
+    }
+    arr.length--;
+    console.log(`jkjkkj  ${JSON.stringify(debits)}`);
+}
+function handleHttpReq(req, res)
+{
+    console.log("method=" + req.method);
+
+    if (req.method == "OPTIONS")
+    {
+        res.writeHead(204, headers);
+        res.end();
+        return;
+    } else if (req.method == "POST")
+    {
+        console.log("POST request");
+        body = "";
+
+        req.on("data", function (chunk)
+        {
+            body += chunk;
+        });
+
+        req.on("end", function ()
+        {
+            processReqAndSendResp(req, res);
+        });
+    } else
+    {
+        console.log("Get request");
+    }
+
+    /*console.log("Get1 Request received");
+    
+      res.setHeader("Content-Type", "text/html");
+      res.writeHead(200);
+      res.end("<html><body><h1>Counter "+counter+"</h1></body></html>");
+    counter++;*/
+}
+
+http.createServer(handleHttpReq).listen(3000);
+
+console.log("Server 1124:80");

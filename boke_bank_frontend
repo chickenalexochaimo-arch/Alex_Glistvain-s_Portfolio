@@ -1,0 +1,410 @@
+// This was a small project I built for my friends
+// Essentially, this is the client of the bank I made
+<html>
+
+<head>
+   <title> chicefian debit card web </title>
+   <script>
+      function start_screen()
+      {
+         draw_screen();
+      }
+
+      var password_to_post = `123_zovc`;
+      var do_i_heve_debits = 0;
+      var debits = [];
+      var log = [];
+      
+      function draw_screen()
+      {
+         var str = ``;
+         var i;
+         var l;
+         var screen = document.getElementById(`screen`);
+         str = `<table><tr><td><input id="input_field_name" value="name" type="text"></td></tr><tr><td><input id="input_field_password" value="password" type="password"></td><td><button onclick="log_in()">NeXt</button></td></tr></table>`;
+         screen.innerHTML = `${str}`;
+      }
+      function log_in()
+      {
+         var name1 = document.getElementById(`input_field_name`);
+         var password1 = document.getElementById(`input_field_password`);
+         name = name1.value;
+         password = password1.value;
+         var send_obj = { command: `check_password`, user: name1.value, password: password1.value };
+         send_msg(send_obj);
+      }
+      function get_debits_for(user, password)
+      {
+         var send_obj = { command: `get_debits`, user: user, password: password };
+         send_msg(send_obj);
+
+      }
+      function get_log_for(user, password)
+      {
+         var send_obj = { command: `get_log`, user: user, password: password };
+         send_msg(send_obj);
+
+      }
+      var name = ``;
+      var password = ``;
+      var user = -1;
+      var is_my_password_right = 0;
+      function resp_received(socket)
+      {
+         var act_resp = JSON.parse(socket.responseText);
+         console.log(`recieved ${socket.responseText}`);
+         var req1 = JSON.parse(socket.responseText);
+         var i;
+         var str = ``;
+         if (req1.command == `send_debits`)
+         {
+            debits = req1.debits_arr;
+            do_i_heve_debits = 1;
+           console.log(`${JSON.stringify(debits)}`)
+            if (is_my_password_right == 1)
+            {
+               display_welcome_screen();
+               is_my_password_right = 0;
+            }
+            //  draw_screen();
+         }
+         if (req1.command == `send_log`)
+         {
+            log =JSON.stringify( req1.log_arr);
+            check_password(name,password);
+          get_debits_for(user, password);
+            //  draw_screen();
+         }
+         else if (req1.command == `password_checked`)
+         {
+            if (req1.true_false == 1)
+            {
+               is_my_password_right = 1;
+               user = req1.user;
+               get_debits_for(user, password);
+            }
+            else
+            {
+               var password_screen = document.getElementById(`password_screen`);
+               password_screen.innerHTML = `<div style="color:red;">PaSsWoRd Is InVaLiD</div>`;
+            }
+         }
+         else if (req1.command == `password_changed`)
+         {
+            password = req1.password;
+            display_welcome_screen();
+         }
+         else if (req1.command == `name_list_created`)
+         {
+            name_arr = req1.arr;
+            display_transfer_screen();
+         }
+         else if (req1.command == `transfer_sucsessful`)
+         {
+            var password_screen = document.getElementById(`password_screen`);
+            password_screen.innerHTML = `TrAnSfEr SuCsEsSfUlL`;
+            is_my_password_right=1
+            get_debits_for(user,password)
+         }
+         else if (req1.command == `account_registered`)
+         {
+            var password_screen = document.getElementById(`password_screen`);
+            password_screen.innerHTML = `CrEaTiOn Of AcCoUnT wAs SuCcEsSfUl`;
+            is_my_password_right = 1;
+            get_debits_for(user, password)
+         }
+         else if (req1.command == `debits_updated`)
+         {
+            is_my_password_right = 1;
+            get_debits_for(user, password);
+         }
+         else if (req1.command == `delete_sucsessful`)
+         {
+             var password_screen = document.getElementById(`password_screen`);
+            password_screen.innerHTML = `delete SuCsEsSfUlL`;
+            is_my_password_right=1
+            get_debits_for(user,password)
+         }
+        else if (req1.command == `reset_sucsessful`)
+         {
+             var password_screen = document.getElementById(`password_screen`);
+            password_screen.innerHTML = `delete SuCsEsSfUlL`;
+            is_my_password_right=1
+            get_debits_for(user,password)
+         }
+
+      }
+      var name_arr = [];
+      function display_transfer_screen()
+      {
+         var str = ``;
+         var i;
+         var str1 = ``;
+         str1 += `<select id="name_dropdown">`;
+         for (i = 0; i < name_arr.length; i++)
+         {
+            str1 += `<option>${name_arr[i]}</option>`;
+         }
+         str1 += `</select>`;
+         str = `<input id="amount_field" value="Write_amount_to_transfer">${str1}<button onclick="finish_transfering()">FiNiSh ThE tRaNsFeR</button>`;
+         var password_screen = document.getElementById(`password_screen`);
+         password_screen.innerHTML = str;
+      }
+      function finish_transfering()
+      {
+         var name_dropdown = document.getElementById(`name_dropdown`);
+         var amount_field = document.getElementById(`amount_field`);
+         if ((parseInt(amount_field.value) != NaN) && (parseInt(amount_field.value) <= debits.money))
+         {
+            send_obj = { command: `transfer_money`, password: password, me: user, who_to_transfer_to: name_arr[name_dropdown.selectedIndex], amount: amount_field.value, user: user };
+            send_msg(send_obj);
+         }
+      }
+      var jk=new Date().toLocaleString("en-US", {timeZone: "America/New_York"})
+      function go_to_transfer_screen()
+      {
+         var send_obj = { command: `get_name_list` };
+         send_msg(send_obj);
+      }
+      function display_welcome_screen()
+      {
+         var str = ``;
+         var screen = document.getElementById(`screen`);
+         screen.innerHTML = ``;
+         screen = document.getElementById(`password_screen`);
+         if (debits.admin == 0)
+         {
+            str += `<h1>Welcome Back ${debits.name} <p> Your balance:${debits.money} <p>
+                     <button onclick="change_password()">ChAnGe PaSsWoRd</button><p><button onclick="go_to_transfer_screen()">Go To TrAnSfEr ScReEn</button>`;
+         }
+         else
+         {
+
+            str += `<table><tr>`;
+
+            for (i = 0; i < debits.length; i++)
+            {
+               str += `<td style="border: solid 3px red;height:20px;width:160px;">${debits[i].name}-|||-${debits[i].num}-|||- money=${debits[i].money} boke coins <button onclick="delete_account('${i}')">DeLeTe aCcOuNt</button><button onclick="reset_password('${i}')">ReSeT PaSsWoRd</button><button onclick="password_screen(${i})">edit</button></td>`;
+            }
+            str += `</tr><tr><button onclick="add_account()">CrEaTe NeW aCcOuNt</button><button onclick="change_password()">ChAnGe PaSsWoRd</button><button onclick="get_log_for(${user},'${password}')">GeT lOg</button></tr><tr><td><div style="color:aqua;">log=</div>${log}</td></tr></table>`;
+         }
+         screen.innerHTML = str;
+
+      }
+     function reset_password(index)
+     {
+       send_obj = { command: `reset_password`, password: password, user: user, who_to_reset: index,password_to_change_to:`123` };
+       console.log(send_obj)
+         send_msg(send_obj);
+     }
+    function delete_account(index)
+     {
+       send_obj = { command: `delete_account`, password: password, user: user, who_to_delete: index};
+       console.log(send_obj)
+         send_msg(send_obj);
+     }
+      var did_i_just_come_out_of_password_checked = 0;
+      function change_password()
+      {
+         var screen = document.getElementById(`screen`);
+         var str = ``;
+         str = `<input type="password" id="input_field" value=""><button onclick="done_writing_new_password()">SuBmIt_new_password</button>`;
+         screen.innerHTML = str;
+      }
+      function done_writing_new_password()
+      {
+         var input_field = document.getElementById(`input_field`);
+         var send_obj = { command: `change_password`, old_password: password, password_to_change_to: input_field.value, user: user };
+         send_msg(send_obj);
+
+      }
+      function add_post()
+      {
+         var password_screen_1 = document.getElementById(`password_screen`);
+         str = `<input id="input_field" value="" type="password"><button onclick="check_password_post()">submit</button>`;
+         password_screen_1.innerHTML = str;
+      }
+      function delete_post(pos)
+      {
+         var password_screen_1 = document.getElementById(`password_screen`);
+         str = `<input id="input_field" value="" type="password"><button onclick="check_password_delete_post(${pos})">submit</button>`;
+         password_screen_1.innerHTML = str;
+      }
+      function check_password_delete_post(pos)
+      {
+         var input_field = document.getElementById(`input_field`);
+         var password_screen_1 = document.getElementById(`password_screen`);
+         if (input_field.value == password_to_post)
+         {
+            delete_from_arr_post(pos);
+         }
+         draw_screen();
+      }
+      function send_msg(msg)
+      {
+         var url = "https://chicefian-boke-bank-server.glitch.me/";
+         //var url = "http://127.0.0.1/";
+         var socket = new XMLHttpRequest();
+         socket.open('POST', url, true);
+         console.log(`send =${JSON.stringify(msg)}`);
+         //curr_ajax.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+         socket.responseType = 'text';
+         socket.send(JSON.stringify(msg));
+
+         socket.onreadystatechange = function ()
+         {
+            if ((this.readyState == 4) && (this.status == 200))
+            {
+               resp_received(socket);
+            }
+         };
+      }
+      function add_account()
+      {
+         var password_screen_1 = document.getElementById(`password_screen`);
+         var str = ``;
+         str = `<input id="input_field_name_new" value="Their Name" type="text">`;
+         str += `<input id="input_field_num" value="Their Card Number" type="text">
+                 <input id="input_field_password" value="Their password" type="password">
+         <button onclick="submit_another_account()">submit</button>`;
+
+         password_screen_1.innerHTML = str;
+      }
+      function submit_another_account()
+      {
+         var input_field_name_new = document.getElementById(`input_field_name_new`);
+         var input_field_num = document.getElementById(`input_field_num`);
+         var input_field_password = document.getElementById(`input_field_password`);
+         var new_account_obj = { command: `new_account`, num: input_field_num.value, name: input_field_name_new.value, money: 0, password: input_field_password.value };
+         send_msg(new_account_obj);
+         draw_screen();
+
+      }
+      var arr_post = [];
+      function check_password_post()
+      {
+         var input_field = document.getElementById(`input_field`);
+         var password_screen_1 = document.getElementById(`password_screen`);
+         if (input_field.value == password_to_post)
+         {
+            password_screen_1.innerHTML = `<input id="post" value="post here" type="text"><button onclick="submit_post()">submit</button>`;
+         }
+         draw_screen();
+      }
+      var diolag = ``;
+      var num_posts = 0;
+      function submit_post()
+      {
+         var post = document.getElementById(`post`);
+         if (post != null)
+         {
+            num_posts++;
+            arr_post.length++;
+            arr_post[arr_post.length - 1] = post.value;
+         }
+         var i;
+         var str = ``;
+         for (i = 0; i < arr_post.length; i++)
+         {
+            str += `<div style="color:green">${arr_post[i]}</div><button onclick="delete_post(${i})">DeLeTe</button>`;
+         }
+         diolag = str;
+         draw_screen();
+      }
+      function password_screen(person)
+      {
+         var password_screen_1 = document.getElementById(`password_screen`);
+         var str = ``;
+         str = `<input id="input_field" value="${debits[person].money}" type="text"><button onclick="submit_boke_coins(${person})">submit</button>`;
+         password_screen_1.innerHTML = str;
+
+      }
+      function submit_boke_coins(person)
+      {
+         var input_field = document.getElementById(`input_field`);
+         var send_obj = { command: `update_debits`, person: person, num_boke_coins: input_field.value, password: password, user: user };
+         send_msg(send_obj);
+      }
+      var true_false = 0;
+      function check_password(person,typed_password)
+      {
+
+         var str = ``;
+         var password_screen_1 = document.getElementById(`password_screen`);
+         var input_field = document.getElementById(`input_field`);
+         if (did_i_just_come_out_of_password_checked == 0)
+         {
+            var send_obj = { command: `check_password`, password: typed_password, user: person };
+            send_msg(send_obj);
+         }
+         else
+         {
+            if (true_false == 1)
+            {
+               str = `<input id="input_field_name" value="${debits[person].name}" type="text"><button onclick="submit_processor(${person},'n')">submit</button><p>`;
+               str += `<input id="input_field_boke_coins" value="${debits[person].money}" type="text"><button onclick="submit_processor(${person},'b')">submit</button><p>`;
+               str += `<button onclick="delete_from_arr(${person})">DEleTE</button>`;
+            }
+            else
+            {
+               draw_screen();
+            }
+            password_screen_1.innerHTML = str;
+            did_i_just_come_out_of_password_checked = 0;
+         }
+
+      }
+      function delete_from_arr(pos)
+      {
+         var i;
+         for (i = pos; i < (debits.length - 1); i++)
+         {
+            debits[i] = debits[i + 1];
+         }
+         debits.length--;
+         var password_screen_1 = document.getElementById(`password_screen`);
+         password_screen_1.innerHTML = ``;
+         draw_screen();
+      }
+      function delete_from_arr_post(pos)
+      {
+         var i;
+         for (i = pos; i < (arr_post.length); i++)
+         {
+            arr_post[i] = arr_post[i + 1];
+         }
+         arr_post.length--;
+         submit_post();
+         var password_screen_1 = document.getElementById(`password_screen`);
+         password_screen_1.innerHTML = ``;
+         draw_screen();
+      }
+      function submit_processor(person, where_to_put)
+      {
+         var password_screen_1 = document.getElementById(`password_screen`);
+         var send_obj;
+         if (where_to_put == `n`)
+         {
+            var input_field_name = document.getElementById(`input_field_name`);
+            debits[person].name = input_field_name.value;
+         }
+         else if (where_to_put == `b`)
+         {
+            var input_field_boke_coins = document.getElementById(`input_field_boke_coins`);
+            debits[person].money = input_field_boke_coins.value;
+         }
+         send_obj = { command: `update_debits`, debits: debits };
+         send_msg(send_obj);
+         password_screen_1.innerHTML = ``;
+         draw_screen();
+      }
+
+   </script>
+</head>
+
+<body onload="start_screen()">
+   <div id="screen"></div>
+   <div id="password_screen"></div>
+</body>
+
+</html>

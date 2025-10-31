@@ -1,5 +1,9 @@
-// This was a small project I built for my friend and I
-// Essentially, this is the server of the bank I made
+/*
+This was a small project I built for my friends.
+Essentially, this is the server of the bank I made.
+This was in 6th grade, and we decided to start a made-up country,
+and we needed a bank to store the money.
+*/
 var http = require("http");
 var counter = 0;
 var bank_state_template = {
